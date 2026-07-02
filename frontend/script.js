@@ -1,32 +1,94 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('products-container');
+    const productsContainer = document.getElementById('products-container');
+    const navAuth = document.getElementById('navAuth');
 
-    // Dynamic fallback to the current domain to play nice with cluster routing proxies
-    const BACKEND_URL = window.location.hostname === 'localhost' 
-        ? 'http://localhost:5000/api/products' 
-        : '/api/products'; 
+    // --- SHARED AUTH STATE LOGIC ---
+    const token = localStorage.getItem('token');
+    const userEmail = localStorage.getItem('email');
 
-    fetch(BACKEND_URL)
-        .then(response => response.json())
-        .then(products => {
-            if(products.length === 0) {
-                container.innerHTML = '<p>No products found.</p>';
-                return;
-            }
-            products.forEach(product => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <h3>${product.name}</h3>
-                    <p>${product.description}</p>
-                    <p class="price">$${product.price}</p>
-                    <button class="btn">Add to Cart</button>
-                `;
-                container.appendChild(card);
+    if (navAuth) {
+        if (token) {
+            navAuth.innerHTML = `<span>Welcome, ${userEmail}</span> <a href="#" id="logoutBtn">Logout</a>`;
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                localStorage.clear();
+                window.location.href = 'login.html';
             });
-        })
-        .catch(err => {
-            console.error('Error fetching products:', err);
-            container.innerHTML = '<p style="color:red;">Failed to load products. Check backend connectivity.</p>';
+        } else {
+            navAuth.innerHTML = `<a href="login.html">Login</a> <a href="register.html">Register</a>`;
+        }
+    }
+
+    // --- SIGN UP SUBMIT ---
+    const regForm = document.getElementById('regForm');
+    if (regForm) {
+        regForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert('Registration successful! Please login.');
+                window.location.href = 'login.html';
+            } else {
+                alert(data.error || 'Registration failed');
+            }
         });
+    }
+
+    // --- LOGIN SUBMIT ---
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('email', data.email);
+                window.location.href = 'index.html';
+            } else {
+                alert(data.error || 'Login failed');
+            }
+        });
+    }
+
+    // --- FETCH PRODUCTS CATALOG ---
+    if (productsContainer) {
+        fetch('/api/products')
+            .then(res => res.json())
+            .then(products => {
+                productsContainer.innerHTML = '';
+                if (products.length === 0) {
+                    productsContainer.innerHTML = '<p>No products dynamically synced yet.</p>';
+                    return;
+                }
+                products.forEach(product => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <h3>${product.name}</h3>
+                        <p>${product.description}</p>
+                        <p class="price">$${Number(product.price).toFixed(2)}</p>
+                        <button class="btn">Add to Cart</button>
+                    `;
+                    productsContainer.appendChild(card);
+                });
+            })
+            .catch(err => {
+                productsContainer.innerHTML = '<p style="color:red;">Error syncing catalog from backend.</p>';
+            });
+    }
 });
