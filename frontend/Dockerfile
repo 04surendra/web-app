@@ -1,14 +1,4 @@
-# frontend/Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/build /usr/share/nginx/html
-COPY --from=builder /app/nginx.conf /etc/nginx/nginx.conf
-EXPOSE 3000
-CMD ["nginx", "-g", "daemon off;"]
+FROM nginxinc/nginx-unprivileged:alpine
+COPY index.html /usr/share/nginx/html/
+COPY script.js /usr/share/nginx/html/
+EXPOSE 8080
